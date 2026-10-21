@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>The Daily Grind: Barista Shuffleboard</title>
+
+<!-- iOS Fullscreen & Standalone Compatibility -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Daily Grind" />
+<meta name="theme-color" content="#18141f" />
+
+<style>
+  :root {
+    --bg-dark: #121017;
+    --bar-wood: #261e1b;
+    --bar-border: #4d3a2f;
+    --accent-purple: #875af0;
+    --accent-light: #ab8bf7;
+    --text-main: #f5f3f7;
+    --text-dim: #9e94aa;
+  }
+  * {
+    box-sizing: border-box;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
+    margin: 0;
+    padding: 0;
+  }
+  html, body {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    background: var(--bg-dark);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    color: var(--text-main);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #game-frame {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    height: 100%;
+    max-height: 100dvh;
+    background: #191522;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  }
+  header {
+    height: 56px;
+    min-height: 56px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+    background: #1e1929;
+    border-bottom: 2px solid #2e263c;
+    z-index: 10;
+  }
+  .header-left h1 { font-size: 14px; font-weight: 800; letter-spacing: 0.5px; }
+  .header-left span { font-size: 10px; color: var(--accent-light); font-weight: 600; display: block; }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .stat-badge {
+    background: #2a2339;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .btn-icon {
+    background: #332b45;
+    border: none;
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #stage-wrap {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    overflow: hidden;
+    background: linear-gradient(180deg, #18141f 0%, #201a2b 100%);
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Overlay alerts & screens */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 13, 22, 0.94);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+    z-index: 30;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .overlay h2 { font-size: 24px; margin-bottom: 8px; }
+  .overlay p { font-size: 12px; color: var(--text-dim); line-height: 1.5; margin-bottom: 16px; }
+  .btn-primary {
+    background: linear-gradient(135deg, #875af0, #6139be);
+    color: #fff;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(135, 90, 240, 0.4);
+  }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid #453761;
+    color: #b7a9d4;
+    padding: 8px 18px;
+    border-radius: 18px;
+    font-size: 11px;
+    margin-top: 10px;
+    cursor: pointer;
+  }
+  .recipe-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+  .recipe-card {
+    background: #201930;
+    border: 1px solid #362a52;
+    border-radius: 6px;
+    padding: 6px 2px;
+    font-size: 9px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .recipe-card span.icon { font-size: 16px; margin-bottom: 2px; }
+
+  #shift-banner {
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: rgba(22, 17, 32, 0.96);
+    border: 2px solid var(--accent-purple);
+    border-radius: 14px;
+    padding: 14px 18px;
+    text-align: center;
+    width: 82%;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 25;
+  }
+  #shift-banner.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  #shift-banner h3 { font-size: 16px; color: #48bb78; margin-bottom: 4px; }
+  #shift-banner p { font-size: 11px; color: #d0c8e0; }
+</style>
+</head>
+<body>
+
+<div id="game-frame">
+  <header>
+    <div class="header-left">
+      <h1>THE DAILY GRIND</h1>
+      <span id="shift-label">Shift 1 • Marble Prep Counter</span>
+    </div>
+    <div class="header-right">
+      <div class="stat-badge">SCORE: <span id="score">0</span></div>
+      <button class="btn-icon" id="info-btn">?</button>
+    </div>
+  </header>
+
+  <div id="stage-wrap">
+    <canvas id="stage"></canvas>
+
+    <!-- Shift Promotion Toast -->
+    <div id="shift-banner">
+      <div style="font-size: 24px; margin-bottom: 4px;">✨</div>
+      <h3 id="banner-title">COUNTER UPGRADED!</h3>
+      <p id="banner-desc">Surface polished: lower friction active!</p>
+    </div>
+
+    <!-- Splash Screen -->
+    <div id="screen-splash" class="overlay">
+      <div style="font-size: 40px; margin-bottom: 8px;">☕</div>
+      <h2>THE DAILY GRIND</h2>
+      <p style="max-width: 270px;">
+        <strong>Barista Shuffleboard:</strong> Drag back or push forward to slide ingredients along the counter. Merge matching items and avoid crowding the foul line!
+      </p>
+      <button class="btn-primary" id="start-btn">Start Shift</button>
+      <button class="btn-secondary" id="rules-btn">Recipe & Rules</button>
+    </div>
+
+    <!-- Instructions Screen -->
+    <div id="screen-info" class="overlay" style="display: none;">
+      <h2>HOW TO PLAY</h2>
+      <p>Touch the puck in the launch lane, drag to aim & power your push, then release to slide:</p>
+      
+      <div class="recipe-grid">
+        <div class="recipe-card"><span class="icon">🌱</span><span>Raw Bean (4)</span></div>
+        <div class="recipe-card"><span class="icon">🟤</span><span>Roast (8)</span></div>
+        <div class="recipe-card"><span class="icon">☕</span><span>Puck (16)</span></div>
+        <div class="recipe-card"><span class="icon">✨</span><span>Crema (32)</span></div>
+        <div class="recipe-card"><span class="icon">🥛</span><span>Oat Foam (64)</span></div>
+        <div class="recipe-card"><span class="icon">🫖</span><span>Flat White (128)</span></div>
+        <div class="recipe-card"><span class="icon">🧊</span><span>Cold Brew (256)</span></div>
+        <div class="recipe-card"><span class="icon">⚡</span><span>Litta Can (512)</span></div>
+      </div>
+
+      <p style="font-size: 11px; text-align: left; color:#c7badb; line-height: 1.5; margin-bottom: 14px;">
+        • <strong>Slide & Hit:</strong> Stationary pucks get knocked forward on impact.<br/>
+        • <strong>Merge:</strong> Identical items merge into higher tiers, clearing room.<br/>
+        • <strong>Foul Line:</strong> If a piece bounces back behind the launch line, round ends!
+      </p>
+      <button class="btn-primary" id="close-info-btn">Back to Shift</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="screen-game-over" class="overlay" style="display: none;">
+      <h2 style="color: #ff6b81;">COUNTER FOUL!</h2>
+      <p>A piece crossed behind the foul line.</p>
+      <div style="font-size: 20px; font-weight: bold; margin-bottom: 16px;">Final Score: <span id="final-score">0</span></div>
+      <button class="btn-primary" id="restart-btn">Wipe Counter & Restart</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  const container = document.getElementById('stage-wrap');
+  const scoreEl = document.getElementById('score');
+  const finalScoreEl = document.getElementById('final-score');
+  const shiftLabel = document.getElementById('shift-label');
+  const shiftBanner = document.getElementById('shift-banner');
+  const bannerDesc = document.getElementById('banner-desc');
+
+  const screenSplash = document.getElementById('screen-splash');
+  const screenInfo = document.getElementById('screen-info');
+  const screenGameOver = document.getElementById('screen-game-over');
+
+  let W = 360;
+  let H = 540;
+  let dpr = 1;
+
+  // Counter zones
+  let FOUL_Y = 0;
+  let LAUNCH_Y = 0;
+
+  // Surface friction & shift modifiers
+  const SHIFTS = [
+    { name: 'Shift 1 • Marble Prep Counter', drag: 0.982, bounce: 0.55, scoreReq: 0 },
+    { name: 'Shift 2 • Polished Stainless', drag: 0.989, bounce: 0.65, scoreReq: 350 },
+    { name: 'Shift 3 • Speed Rail Rush', drag: 0.993, bounce: 0.72, scoreReq: 900 }
+  ];
+  let currentShiftIndex = 0;
+
+  let score = 0;
+  let gameRunning = false;
+  let isGameOver = false;
+
+  let pucks = [];
+  let particles = [];
+  let activePuck = null;
+  let nextTier = 0;
+
+  // Touch / Drag input state
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragCurrentX = 0;
+  let dragCurrentY = 0;
+
+  const TIERS = [
+    { name: 'Green Bean', r: 15, mass: 1.0, color: '#528549', pts: 4, icon: '🌱' },
+    { name: 'Roasted Bean', r: 19, mass: 1.4, color: '#442a1f', pts: 8, icon: '🟤' },
+    { name: 'Coffee Puck', r: 25, mass: 2.1, color: '#271710', pts: 16, icon: '☕' },
+    { name: 'Crema Shot', r: 31, mass: 3.0, color: '#bd7b37', pts: 32, icon: '✨' },
+    { name: 'Steamed Oat', r: 38, mass: 4.2, color: '#d9ccb6', pts: 64, icon: '🥛' },
+    { name: 'Flat White', r: 46, mass: 5.6, color: '#b38b5f', pts: 128, icon: '🫖' },
+    { name: 'Cold Brew', r: 55, mass: 7.2, color: '#2b1b15', pts: 256, icon: '🧊' },
+    { name: 'Litta Can', r: 64, mass: 9.5, color: '#72469c', pts: 512, icon: '⚡' }
+  ];
+
+  function resize() {
+    W = container.clientWidth;
+    H = container.clientHeight;
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+
+    FOUL_Y = Math.floor(H * 0.76);
+    LAUNCH_Y = Math.floor(H * 0.88);
+
+    if (activePuck && !activePuck.launched) {
+      activePuck.x = W / 2;
+      activePuck.y = LAUNCH_Y;
+    }
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
+
+  function getRandomTier() {
+    return Math.floor(Math.random() * 3);
+  }
+
+  class Particle {
+    constructor(x, y, color) {
+      this.x = x; this.y = y;
+      this.vx = (Math.random() - 0.5) * 5;
+      this.vy = (Math.random() - 0.5) * 5;
+      this.color = color;
+      this.alpha = 1;
+      this.radius = Math.random() * 3 + 2;
+    }
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.alpha -= 0.035;
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class Puck {
+    constructor(x, y, tier, launched = false) {
+      this.x = x;
+      this.y = y;
+      this.vx = 0;
+      this.vy = 0;
+      this.tier = tier;
+      this.r = TIERS[tier].r;
+      this.mass = TIERS[tier].mass;
+      this.color = TIERS[tier].color;
+      this.icon = TIERS[tier].icon;
+      this.launched = launched;
+      this.toRemove = false;
+    }
+
+    update(drag, bounce) {
+      if (!this.launched) return;
+
+      this.x += this.vx;
+      this.y += this.vy;
+
+      // Surface friction (shuffleboard drag)
+      this.vx *= drag;
+      this.vy *= drag;
+
+      if (Math.hypot(this.vx, this.vy) < 0.05) {
+        this.vx = 0;
+        this.vy = 0;
+      }
+
+      // Stainless steel side bumper rebounds
+      if (this.x - this.r < 10) {
+        this.x = 10 + this.r;
+        this.vx = -this.vx * bounce;
+      } else if (this.x + this.r > W - 10) {
+        this.x = W - 10 - this.r;
+        this.vx = -this.vx * bounce;
+      }
+
+      // Back bumper bounce
+      if (this.y - this.r < 10) {
+        this.y = 10 + this.r;
+        this.vy = -this.vy * bounce;
+      }
+
+      // Foul check: puck crossed back past the foul line after sliding forward
+      if (this.y - this.r > FOUL_Y && Math.hypot(this.vx, this.vy) < 0.2) {
+        triggerGameOver();
+      }
+    }
+
+    draw() {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+
+      // Puck drop shadow
+      ctx.beginPath();
+      ctx.arc(0, 3, this.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fill();
+
+      // Outer bezel ring (shuffleboard stone style)
+      ctx.beginPath();
+      ctx.arc(0, 0, this.r, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.stroke();
+
+      // Inner icon
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `${Math.floor(this.r * 0.75)}px -apple-system, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(this.icon, 0, 1);
+
+      // Apex can branding mark
+      if (this.tier === 7) {
+        ctx.font = 'bold 9px sans-serif';
+        ctx.fillStyle = '#f0dbff';
+        ctx.fillText('LITTA', 0, this.r * 0.44);
+      }
+
+      ctx.restore();
+    }
+  }
+
+  function spawnReadyPuck() {
+    activePuck = new Puck(W / 2, LAUNCH_Y, nextTier, false);
+    nextTier = getRandomTier();
+  }
+
+  function resolveCollisions(bounce) {
+    const SUBSTEPS = 4;
+    for (let s = 0; s < SUBSTEPS; s++) {
+      for (let i = 0; i < pucks.length; i++) {
+        for (let j = i + 1; j < pucks.length; j++) {
+          const p1 = pucks[i];
+          const p2 = pucks[j];
+          if (p1.toRemove || p2.toRemove) continue;
+
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const dist = Math.hypot(dx, dy);
+          const minDist = p1.r + p2.r;
+
+          if (dist < minDist && dist > 0.001) {
+            // Merge condition
+            if (p1.tier === p2.tier && p1.tier < TIERS.length - 1 && s === 0) {
+              p1.toRemove = true;
+              p2.toRemove = true;
+              const nextTierIdx = p1.tier + 1;
+              const mx = (p1.x + p2.x) / 2;
+              const my = (p1.y + p2.y) / 2;
+
+              for (let k = 0; k < 8; k++) {
+                particles.push(new Particle(mx, my, TIERS[nextTierIdx].color));
+              }
+
+              const merged = new Puck(mx, my, nextTierIdx, true);
+              merged.vx = (p1.vx + p2.vx) * 0.4;
+              merged.vy = (p1.vy + p2.vy) * 0.4;
+              pucks.push(merged);
+
+              score += TIERS[nextTierIdx].pts;
+              scoreEl.textContent = score;
+              checkShiftPromotion();
+              return;
+            }
+
+            // Shuffleboard momentum transfer
+            const overlap = (minDist - dist) / dist;
+            const nx = dx * overlap;
+            const ny = dy * overlap;
+            const m1 = p1.mass / (p1.mass + p2.mass);
+            const m2 = p2.mass / (p1.mass + p2.mass);
+
+            p1.x -= nx * m2;
+            p1.y -= ny * m2;
+            p2.x += nx * m1;
+            p2.y += ny * m1;
+
+            const rvx = p2.vx - p1.vx;
+            const rvy = p2.vy - p1.vy;
+            const normX = dx / dist;
+            const normY = dy / dist;
+            const velAlongNorm = rvx * normX + rvy * normY;
+
+            if (velAlongNorm < 0) {
+              const impulse = (-(1 + bounce) * velAlongNorm) / (1 / p1.mass + 1 / p2.mass);
+              p1.vx -= (impulse / p1.mass) * normX;
+              p1.vy -= (impulse / p1.mass) * normY;
+              p2.vx += (impulse / p2.mass) * normX;
+              p2.vy += (impulse / p2.mass) * normY;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function checkShiftPromotion() {
+    if (currentShiftIndex === 0 && score >= SHIFTS[1].scoreReq) {
+      promoteShift(1);
+    } else if (currentShiftIndex === 1 && score >= SHIFTS[2].scoreReq) {
+      promoteShift(2);
+    }
+  }
+
+  function promoteShift(idx) {
+    currentShiftIndex = idx;
+    const cfg = SHIFTS[idx];
+    shiftLabel.textContent = cfg.name;
+
+    for (let p = 0; p < 25; p++) {
+      particles.push(new Particle(W / 2, H / 3, '#f6e05e'));
+    }
+
+    bannerDesc.textContent = `${cfg.name} unlocked. Counter friction adjusted!`;
+    shiftBanner.classList.add('show');
+    setTimeout(() => {
+      shiftBanner.classList.remove('show');
+    }, 2500);
+  }
+
+  function loop() {
+    if (!gameRunning) return;
+    ctx.clearRect(0, 0, W, H);
+    const shift = SHIFTS[currentShiftIndex];
+
+    // Counter table side bumpers (curved metallic trim)
+    ctx.fillStyle = '#261e2f';
+    ctx.fillRect(0, 0, 10, H);
+    ctx.fillRect(W - 10, 0, 10, H);
+
+    // Shuffleboard Foul Line
+    ctx.strokeStyle = 'rgba(235, 87, 87, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.moveTo(10, FOUL_Y);
+    ctx.lineTo(W - 10, FOUL_Y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = 'rgba(235, 87, 87, 0.5)';
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillText('FOUL LINE', 16, FOUL_Y - 6);
+
+    // Launch Lane Marker
+    ctx.strokeStyle = 'rgba(135, 90, 240, 0.25)';
+    ctx.beginPath();
+    ctx.arc(W / 2, LAUNCH_Y, 28, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Aiming Chevron & Drag Power Indicator
+    if (isDragging && activePuck) {
+      const pullX = dragCurrentX - dragStartX;
+      const pullY = dragCurrentY - dragStartY;
+      const angle = Math.atan2(-pullY, -pullX);
+      const pullDist = Math.min(100, Math.hypot(pullX, pullY));
+
+      if (pullDist > 6) {
+        const aimDist = pullDist * 2.2;
+        const targetX = activePuck.x + Math.cos(angle) * aimDist;
+        const targetY = activePuck.y + Math.sin(angle) * aimDist;
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(activePuck.x, activePuck.y);
+        ctx.lineTo(targetX, targetY);
+        ctx.stroke();
+
+        ctx.fillStyle = '#875af0';
+        ctx.beginPath();
+        ctx.arc(targetX, targetY, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Active puck waiting to slide
+    if (activePuck && !activePuck.launched) {
+      activePuck.draw();
+    }
+
+    // Update active sliding pucks
+    pucks.forEach(p => p.update(shift.drag, shift.bounce));
+    resolveCollisions(shift.bounce);
+    pucks = pucks.filter(p => !p.toRemove);
+    pucks.forEach(p => p.draw());
+
+    // Particles
+    particles.forEach(pt => pt.update());
+    particles = particles.filter(pt => pt.alpha > 0);
+    particles.forEach(pt => pt.draw());
+
+    requestAnimationFrame(loop);
+  }
+
+  // Pure Touch and Pointer Input Handlers (Guarantees iOS and Mac Compatibility)
+  function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  }
+
+  function handleStart(e) {
+    if (!gameRunning || isGameOver || !activePuck) return;
+    const pos = getCanvasPos(e);
+    const d = Math.hypot(pos.x - activePuck.x, pos.y - activePuck.y);
+
+    if (d < activePuck.r * 2 || pos.y > FOUL_Y) {
+      isDragging = true;
+      dragStartX = pos.x;
+      dragStartY = pos.y;
+      dragCurrentX = pos.x;
+      dragCurrentY = pos.y;
+    }
+  }
+
+  function handleMove(e) {
+    if (!isDragging) return;
+    const pos = getCanvasPos(e);
+    dragCurrentX = pos.x;
+    dragCurrentY = pos.y;
+  }
+
+  function handleEnd() {
+    if (!isDragging || !activePuck) return;
+    isDragging = false;
+
+    const pullX = dragCurrentX - dragStartX;
+    const pullY = dragCurrentY - dragStartY;
+    const dist = Math.hypot(pullX, pullY);
+
+    // Minimum flick threshold to slide
+    if (dist > 8) {
+      const angle = Math.atan2(-pullY, -pullX);
+      const speed = Math.min(18, dist * 0.18);
+
+      activePuck.vx = Math.cos(angle) * speed;
+      activePuck.vy = Math.sin(angle) * speed;
+      activePuck.launched = true;
+
+      pucks.push(activePuck);
+      activePuck = null;
+
+      // Queue next puck after current slide settles
+      setTimeout(() => {
+        if (!isGameOver) spawnReadyPuck();
+      }, 500);
+    }
+  }
+
+  // Canvas Touch Listeners with non-passive preventDefault (Crucial for iOS Safari)
+  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleStart(e); }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); handleMove(e); }, { passive: false });
+  canvas.addEventListener('touchend', (e) => { e.preventDefault(); handleEnd(); }, { passive: false });
+
+  // Mouse fallback for Mac Safari / Desktop
+  canvas.addEventListener('mousedown', (e) => { e.preventDefault(); handleStart(e); });
+  window.addEventListener('mousemove', (e) => { handleMove(e); });
+  window.addEventListener('mouseup', () => { handleEnd(); });
+
+  function startGame() {
+    screenSplash.style.display = 'none';
+    gameRunning = true;
+    resize();
+    resetShift();
+    requestAnimationFrame(loop);
+  }
+
+  function triggerGameOver() {
+    isGameOver = true;
+    finalScoreEl.textContent = score;
+    screenGameOver.style.display = 'flex';
+  }
+
+  function resetShift() {
+    pucks = [];
+    particles = [];
+    score = 0;
+    scoreEl.textContent = '0';
+    currentShiftIndex = 0;
+    shiftLabel.textContent = SHIFTS[0].name;
+    isGameOver = false;
+    screenGameOver.style.display = 'none';
+    shiftBanner.classList.remove('show');
+    nextTier = getRandomTier();
+    spawnReadyPuck();
+  }
+
+  // Screen UI toggles
+  document.getElementById('start-btn').addEventListener('click', startGame);
+  document.getElementById('rules-btn').addEventListener('click', () => { screenInfo.style.display = 'flex'; });
+  document.getElementById('info-btn').addEventListener('click', () => { screenInfo.style.display = 'flex'; });
+  document.getElementById('close-info-btn').addEventListener('click', () => { screenInfo.style.display = 'none'; });
+  document.getElementById('restart-btn').addEventListener('click', resetShift);
+
+  resize();
+})();
+</script>
+</body>
+</html>
